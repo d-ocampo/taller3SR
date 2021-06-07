@@ -17,15 +17,22 @@ import json
 
 # Surprise libraries
 
+#api de imdb
+from imdb import IMDb
+ia = IMDb()
+
+#similaridad del coseno
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel 
 
 
-# cargar modelos
+#librerías sistema de recomendación
+from surprise import Reader
+from surprise import Dataset
+from surprise.model_selection import train_test_split
+from surprise import KNNBasic
+from surprise import accuracy
 
-#export libraries
-
-# from sklearn.externals import joblib
-import joblib
-import pickle
 
 #graph libraries
 import plotly.graph_objects as go
@@ -40,17 +47,95 @@ import random
 
 ruta=os.getcwd()+'/Data/'
 
-####Funciones 
-
-####Datos
-
 # valor de la cantidad de datos a cargar
 n=100000
 
-# Users
+## Importar archivos
+peliculas=pd.read_csv(ruta+'movies.csv')
+ratings=pd.read_csv(ruta+'ratings.csv')
 
-#Diccionario nombre de negocios
+links=pd.read_csv(ruta+'links.csv')
+tags=pd.read_csv(ruta+'tags.csv')
 
+
+#sistema de recomendación
+reader = Reader( rating_scale = ( 0, 5 ) )
+#Se crea el dataset a partir del dataframe
+surprise_dataset = Dataset.load_from_df( ratings[ [ 'userId', 'movieId', 'rating' ] ], reader )
+
+#Se crea el dataset para modelo 
+rating_data=surprise_dataset.build_full_trainset()
+# Se crea dataset de "prueba" con las entradas faltantes para generar las predicciones
+test=rating_data.build_anti_testset()
+
+#usuarios para la predicción
+users=list(ratings['userId'].unique())
+
+# se crea un modelo knnbasic item-item con similitud coseno 
+sim_options = {'name': 'cosine',
+               'user_based': False  # calcule similitud item-item
+               }
+algo = KNNBasic(k=20, min_k=2, sim_options=sim_options)
+
+#ajustar algoritmo y crear matriz de predicciones
+algo.fit(rating_data)
+predictions=algo.test(test)
+
+
+# función para revisar las n predicciones de los usuarios
+def prediccion_usuario(user,n): 
+    user_predictions=list(filter(lambda x: x[0]==user,predictions))
+    user_predictions.sort(key=lambda x : x.est, reverse=True)
+    pred=user_predictions[0:n]
+    return [i[1] for i in pred]
+
+##########################
+#### TAGS 
+##########################
+
+## data tags para similitud de coseno por tags
+tags_peliculas=tags.groupby(['movieId'])['tag'].apply(','.join).reset_index()
+
+# Crear la matrix de términios de reviews    
+tfidf = TfidfVectorizer(ngram_range=(1, 1), min_df=0.0001, stop_words='english')
+tfidf_matrix = tfidf.fit_transform(tags_peliculas['tag'])
+
+
+# Calcular similirdad del coseno de las demás películas
+cosine_similarities = linear_kernel(tfidf_matrix, tfidf_matrix)
+results = {}
+for idx, row in tags_peliculas.iterrows():
+   similar_indices = cosine_similarities[idx].argsort()[:-100:-1] 
+   similar_items = [(cosine_similarities[idx][i], tags_peliculas['movieId'][i]) for i in similar_indices] 
+   results[row['movieId']] = similar_items[1:]
+
+#recomendación del negocio    
+def peliculas_similares(pelicula,n):
+    if pelicula in results.keys():
+        recomendacion=results[pelicula] 
+        recomendacion.sort(key=lambda x: x[0],reverse=True) 
+        return [i[1] for i in recomendacion[0:n]]
+    else:
+        return [] 
+
+
+#########################
+#### características de la película
+#########################
+
+# diccionario imbd
+imbd_dict={}
+for i in range(len(links)):
+    imbd_dict[links.at[i,'movieId']]=links.at[i,'imdbId']
+    
+# función para devolver películas    
+def ctas_pelicula(pelicula):
+    movie=ia.get_movie(str(imbd_dict[pelicula]))
+    pelicula_dict={}
+    pelicula_dict['director']=[director['name'] for director in movie['directors']]
+    pelicula_dict['genero']=[genre for genre in movie['genres']]
+    pelicula_dict['actores']=[actores['name'] for actores in movie['cast']]
+    return pelicula_dict
 
 top_cards = dbc.Row([
         dbc.Col([dbc.Card(
