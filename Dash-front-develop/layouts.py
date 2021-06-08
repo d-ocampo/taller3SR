@@ -53,11 +53,20 @@ ruta=os.getcwd()+'/Data/'
 n=100000
 
 ## Importar archivos
-peliculas=pd.read_csv(ruta+'movies.csv',nrows=n)
-ratings=pd.read_csv(ruta+'ratings.csv',nrows=n)
+# peliculas=pd.read_csv(ruta+'movies.csv',nrows=n)
+# ratings=pd.read_csv(ruta+'ratings.csv',nrows=n)
 
-links=pd.read_csv(ruta+'links.csv',nrows=n)
-tags=pd.read_csv(ruta+'tags.csv',nrows=n)
+# links=pd.read_csv(ruta+'links.csv',nrows=n)
+# tags=pd.read_csv(ruta+'tags.csv',nrows=n)
+
+#cargar en servidor
+peliculas=pd.read_csv(ruta+'movie.csv',nrows=n)
+ratings=pd.read_csv(ruta+'rating.csv',nrows=n)
+
+links=pd.read_csv(ruta+'link.csv',nrows=n)
+tags=pd.read_csv(ruta+'tag.csv',nrows=n)
+
+
 
 #nube de palabras
 words = peliculas['genres'].str.cat(sep="|").split("|")
