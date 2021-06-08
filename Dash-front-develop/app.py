@@ -53,28 +53,28 @@ top_navbar = dbc.Navbar(
 
 sidebar_header = dbc.Row(
     [
-        dbc.Col(
+        # dbc.Col(
 
-            html.A(
-                # Use row and col to control vertical alignment of logo / brand
-                dbc.Row(
-                    [
-                        dbc.Col([html.Img(src="/assets/images/Yelpme.png",
-                                         className="img-fluid w-50 text-center w-75 pt-5")], className="text-center"),
+        #     html.A(
+        #         # Use row and col to control vertical alignment of logo / brand
+        #         dbc.Row(
+        #             [
+        #                 dbc.Col([html.Img(src="/assets/images/Yelpme.png",
+        #                                  className="img-fluid w-50 text-center w-75 pt-5")], className="text-center"),
                        
-                        ],
+        #                 ],
 
 
-                    align="center",
-                    no_gutters=True,
-                    className="justify-content-center"
-                ),
-                href="#",
+        #             align="center",
+        #             no_gutters=True,
+        #             className="justify-content-center"
+        #         ),
+        #         href="#",
 
-            ),
+        #     ),
 
             
-        ),
+        # ),
         dbc.Col(
             html.Button(
                 # use the Bootstrap navbar-toggler classes to style the toggle
