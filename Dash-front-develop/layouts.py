@@ -53,11 +53,11 @@ ruta=os.getcwd()+'/Data/'
 n=100000
 
 ## Importar archivos
-peliculas=pd.read_csv(ruta+'movies.csv')
-ratings=pd.read_csv(ruta+'ratings.csv')
+peliculas=pd.read_csv(ruta+'movies.csv',nrows=n)
+ratings=pd.read_csv(ruta+'ratings.csv',nrows=n)
 
-links=pd.read_csv(ruta+'links.csv')
-tags=pd.read_csv(ruta+'tags.csv')
+links=pd.read_csv(ruta+'links.csv',nrows=n)
+tags=pd.read_csv(ruta+'tags.csv',nrows=n)
 
 #nube de palabras
 words = peliculas['genres'].str.cat(sep="|").split("|")
@@ -268,6 +268,16 @@ def grafico_red(G):
                     )
     return fig
 
+
+def predi_similares(user,n_pred,n_sim):
+    similares=[]
+    for i in prediccion_usuario(user,n_pred):
+        if len(peliculas_similares(i,n_sim))>0:
+            for j in peliculas_similares(i,n_sim):
+                similares.append(j)
+    similares=np.unique(similares)
+    return similares
+
 top_cards = dbc.Row([
         dbc.Col([dbc.Card(
             [
@@ -378,14 +388,15 @@ home = html.Div([
                    style={"padding": "1rem", "transform" : "rotate(90deg)", "font-size": "2rem", "color": "#999999"}, ),
 # Descripción del problema
             html.P('''
-                    El conjunto de datos de Yelp es un subconjunto de negocios, reseñas y datos de usuario para su uso con fines personales, educativos y académicos. Disponible como archivos JSON, incluye
-                    cuatro tablas principales con datos de negocios, reseñas, usuarios, fotos, checkins y reseñas cortas.
+                    MovieLens, un proyecto de recomendaciones personalizadas de películas impulsado por el grupo de investigación GroupLens de la Universidad de Minnesota, ofrece un conjunto de datos (reseñas, películas, enlaces,...) con lo que han obtenido de sus usuarios hasta septiembre de 2018. 
                    ''',
             style = { "font-color": "#666666", "font-size": "16px", "margin": "1rem auto 0", "padding": "0 12rem"}, className="text-muted"
             
             ),
 
-            html.P('''Licencia: Los datos contenidos en esta herramienta son distribuidos y manipulados con permiso de Yelp. Los datos se encuentran disponibles para su uso no comercial. Para más información, se sugiere revisar los términos de servicio de Yelp (https://www.yelp.com/dataset/).''', style = { "font-color": "#666666", "font-size": "16px", "margin": "1rem auto 0", "padding": "0 12rem"}, className="text-muted"),
+            html.P('''Licencia: Los datos contenidos en esta herramienta son distribuidos y manipulados con permiso de MovieLens. Los datos se encuentran disponibles para su uso no comercial. Para más información, se sugiere revisar los términos de servicio de GroupLens (https://grouplens.org/datasets/movielens/ y https://bit.ly/3w4tksS). 
+
+                   ''', style = { "font-color": "#666666", "font-size": "16px", "margin": "1rem auto 0", "padding": "0 12rem"}, className="text-muted"),
 
             html.Hr(style = {"width" : "100px", "border": "3px solid #999999", "background-color": "#999999", "margin": "3rem auto"}),
 
@@ -406,8 +417,8 @@ home = html.Div([
                             [
                                 html.H3("Dashboard", style = {"color": "#66666"}),
                                 html.P(
-                                    '''Un espacio para obtener estadísticas básicas de usuarios, negocios, reseñas e interacciones, junto a algunos insights sobre sus calificaciones.
-                                    
+                                    '''Un espacio para obtener estadísticas básicas de usuarios, películas, ratings, tags e interacciones, junto a algunos insights sobre sus calificaciones. 
+
                                     ''',
                                     className="card-text", style = {"font-size": "15px"},
                                 ),
@@ -429,7 +440,8 @@ home = html.Div([
                                 html.H3("Recomendación", style = {"color": "#66666"}),
 
                                 html.P(
-                                    '''Acá puedes encontrar el sistema de recomendación híbrido basado en la combinación de modelos colaborativos, de contenido, con factorización,...''',
+                                    '''Acá puedes encontrar el sistema de recomendación híbrido el cual combina modelos colaborativos con enriquecimiento semántico y filtraje ontológico. 
+                                    ''',
                                     className="card-text", style = {"font-size": "15px"},
                                 ),
                                 dbc.Button("Sistema de recomendación",

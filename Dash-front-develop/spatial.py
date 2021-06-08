@@ -66,7 +66,7 @@ spatial = html.Div([
                             {'label': 'Director', 'value': 'director'},
                             {'label': 'Actores', 'value': 'actores'}                        
                         ],
-                        value='genero',
+                        value=['genero'],
                         id='recomend relaciones'
                     )  
                 ])
@@ -138,8 +138,9 @@ spatial = html.Div([
                             dbc.CardBody(
                                 [
                                     dash_table.DataTable(
-                                        id='recomend table',
-                                        columns=[{"name": "Negocios recomendados", "id": "Negocios recomendados"}]
+                                        id='recomend table prediccion',
+                                        columns=[{"name": "Películas recomendadas", "id": "Películas recomendadas"}],
+                                        style_table={'overflowY': 'auto', 'overflowX': 'auto'}
                                     )
                                 ]
                             ),
@@ -155,7 +156,11 @@ spatial = html.Div([
                         [
                             dbc.CardBody(
                                 [
-                                    dcc.Graph(id='recomend similar graph')
+                                    dash_table.DataTable(
+                                        id='recomend table similitud',
+                                        columns=[{"name": "Películas Similares", "id": "Películas Similares"}],
+                                        style_table={'overflowY': 'auto', 'overflowX': 'auto'}
+                                    )
                                 ]
                             ),
                         ],

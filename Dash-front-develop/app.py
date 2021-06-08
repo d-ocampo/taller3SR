@@ -2,8 +2,7 @@
 
 # home,dashboard,aboutus
 from lay import  risk
-from script_inicial.RMSE import calcular_rmse 
-from layouts import home,dashboard,aboutus
+from layouts import home,dashboard,aboutus,peliculas, predi_similares,ratings,tags,links,prediccion_usuario,peliculas_similares,imbd_dict,ctas_pelicula,crear_red,pelicula_dict,nombre_nodo,grafico_red
 
 import os
 #rendimiento de memoria ram
@@ -236,6 +235,40 @@ def update_topTitle(pathname):
 def memory(n):
     mem= 'Memoria en uso: ' + str(psutil.virtual_memory()[2]) +'%'
     return mem
+
+
+
+#Poner el valor de usuario, generar la red y el gráfico
+@app.callback(
+    [Output("recomend user", "children"),
+     Output("recomend grafo", "figure")],
+    [Input("recomend drop", "value"),
+     Input("recomend n_pred", "value"),
+     Input("recomend n_sim", "value"),
+     Input("recomend relaciones", "value")]
+)
+def memory(user,n_pred,n_sim,relaciones):
+    text_user=str(user)
+    G=crear_red(user,n_pred,n_sim,relaciones)
+    fig=grafico_red(G)
+    return text_user,fig
+
+#Poner el valor de usuario, generar la red y el gráfico
+@app.callback(
+    [Output("recomend table prediccion", "data"),
+     Output("recomend table similitud", "data")],
+    [Input("recomend drop", "value"),
+     Input("recomend n_pred", "value"),
+     Input("recomend n_sim", "value")]
+)
+def memory(user,n_pred,n_sim):
+    prediccion =prediccion_usuario(user, n_pred)
+    similar = predi_similares(user,n_pred,n_sim)
+    dict_data_pred=[{'Películas recomendadas': pelicula_dict[i]} for i in prediccion]
+    dict_data_sim=[{'Películas Similares': pelicula_dict[i]} for i in similar]
+    return dict_data_pred,dict_data_sim
+
+
 
 
 if __name__ == "__main__":
