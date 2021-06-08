@@ -40,6 +40,8 @@ import networkx as nx
 import plotly
 import random
 
+import pickle
+
 
 #Resources
 
@@ -57,16 +59,34 @@ ratings=pd.read_csv(ruta+'ratings.csv')
 links=pd.read_csv(ruta+'links.csv')
 tags=pd.read_csv(ruta+'tags.csv')
 
+#nube de palabras
+words = peliculas['genres'].str.cat(sep="|").split("|")
+words_count = len(set(words))
+
+#contar los géneros
+freqs = {}
+for word in words:
+    freqs[word] = freqs.get(word, 0) + 1 # fetch and increment OR initialize
+genres_df = pd.DataFrame(list(freqs.items()), columns=["Género", "Cantidad"]).sort_values("Cantidad", ascending=False)
+# agrupar los tags
+tags_df = tags.groupby(['tag', 'movieId']).size().reset_index(name='counts')
+tags_df = tags_df.groupby(['tag']).size().reset_index(name='películas')
+tags_df = tags_df.sort_values(by="películas", ascending=False)
+tags_df.to_csv("test.csv", index = pickle.FALSE)
+
 
 #sistema de recomendación
 reader = Reader( rating_scale = ( 0, 5 ) )
 #Se crea el dataset a partir del dataframe
 surprise_dataset = Dataset.load_from_df( ratings[ [ 'userId', 'movieId', 'rating' ] ], reader )
 
-#Se crea el dataset para modelo 
-rating_data=surprise_dataset.build_full_trainset()
-# Se crea dataset de "prueba" con las entradas faltantes para generar las predicciones
-test=rating_data.build_anti_testset()
+# #Se crea el dataset para modelo 
+# rating_data=surprise_dataset.build_full_trainset()
+# # Se crea dataset de "prueba" con las entradas faltantes para generar las predicciones
+# test=rating_data.build_anti_testset()
+
+#usar modelo pequeño para entrenar
+rating_data, test=  train_test_split(surprise_dataset, test_size=.2)
 
 #usuarios para la predicción
 users=list(ratings['userId'].unique())
@@ -137,6 +157,117 @@ def ctas_pelicula(pelicula):
     pelicula_dict['actores']=[actores['name'] for actores in movie['cast']]
     return pelicula_dict
 
+
+# crear la red de películas para el grafo con los SR
+def crear_red(usuario,n_pred,n_sim,relaciones): 
+    G = nx.Graph() # crear un grafo
+    G.add_nodes_from(prediccion_usuario(usuario,n_pred))
+    ejes=[]
+    for i in prediccion_usuario(usuario,n_pred):
+        if len(peliculas_similares(i,n_sim))>0:
+            for j in peliculas_similares(i,n_sim):
+                ejes.append((i,j))
+    G.add_edges_from(ejes)
+    ejes_ctas=[]
+    for i in G.nodes:
+        for key in relaciones:
+            if len(ctas_pelicula(i)[key])>0:
+                for j in ctas_pelicula(i)[key]:
+                    ejes_ctas.append((i,j))
+    G.add_edges_from(ejes_ctas)
+    pos = nx.drawing.nx_agraph.graphviz_layout(G, prog='dot')
+    for i in G.nodes:
+        G.nodes[i]['pos']=pos[i]
+    return G
+
+# diccionario con el nombre de las películas, llave es el ID
+pelicula_dict={}
+for i in range(len(peliculas)):
+    pelicula_dict[peliculas.at[i,'movieId']]=peliculas.at[i,'title']
+    
+# elegir un nombre del nodo
+def nombre_nodo(identificador):
+    if identificador in pelicula_dict.keys():
+        return pelicula_dict[identificador]
+    else:
+        return identificador
+
+# realizar el gráfico de red    
+def grafico_red(G):
+    edge_x = []
+    edge_y = []
+    for edge in G.edges():
+        x0, y0 = G.nodes[edge[0]]['pos']
+        x1, y1 = G.nodes[edge[1]]['pos']
+        edge_x.append(x0)
+        edge_x.append(x1)
+        edge_x.append(None)
+        edge_y.append(y0)
+        edge_y.append(y1)
+        edge_y.append(None)
+
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=0.5, color='#888'),
+        hoverinfo='none',
+        mode='lines')
+
+    node_x = []
+    node_y = []
+    for node in G.nodes():
+        x, y = G.nodes[node]['pos']
+        node_x.append(x)
+        node_y.append(y)
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        hoverinfo='text',
+        marker=dict(
+            showscale=True,
+            # colorscale options
+            #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
+            #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
+            #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
+            colorscale='YlGnBu',
+            reversescale=True,
+            color=[],
+            size=10,
+            colorbar=dict(
+                thickness=15,
+                title='Cantidad de conexiones',
+                xanchor='left',
+                titleside='right'
+            ),
+            line_width=2))
+
+    node_adjacencies = []
+    node_text = []
+    for node, adjacencies in G.adjacency():
+        node_adjacencies.append(len(adjacencies))
+    #     node_text.append(str(nombre_nodo(node))+'# de conexiones: '+str(len(adjacencies[1])))
+        node_text.append(str(nombre_nodo(node))+' # de conexiones: '+str(len(adjacencies)))
+
+    node_trace.marker.color = node_adjacencies
+    node_trace.text = node_text
+
+    fig = go.Figure(data=[edge_trace, node_trace],
+                 layout=go.Layout(
+                    title='<br>Grafo de SR de películas',
+                    titlefont_size=16,
+                    showlegend=False,
+                    hovermode='closest',
+                    margin=dict(b=20,l=5,r=5,t=40),
+                    annotations=[ dict(
+                        text="",
+                        showarrow=False,
+                        xref="paper", yref="paper",
+                        x=0.005, y=-0.002 ) ],
+                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                    )
+    return fig
+
 top_cards = dbc.Row([
         dbc.Col([dbc.Card(
             [
@@ -146,7 +277,7 @@ top_cards = dbc.Row([
                         #           className="float-right rounded w-40 danger text-center "),
                         html.H5(
                             "Cantidad total de usuarios", className="card-title text-muted font-weight-normal mt-2 mb-3 mr-5"),
-                        html.H4(children = str('{:,}'.format(len(review_df['user_id'].unique())))),
+                        html.H4(children = str('{:,}'.format(len(ratings['userId'].unique())))),
                     ],
 
                     className="pt-2 pb-2 box "
@@ -165,8 +296,8 @@ top_cards = dbc.Row([
                 dbc.CardBody(
                     [
                         html.H5(
-                            "Cantidad de negocios", className="card-title text-muted font-weight-normal mt-2 mb-3 mr-5"),
-                        html.H4(children = str('{:,}'.format(len(review_df['business_id'].unique())))),
+                            "Cantidad de películas", className="card-title text-muted font-weight-normal mt-2 mb-3 mr-5"),
+                        html.H4(children = str('{:,}'.format(len(peliculas['movieId'].unique())))),
 
                      ],
 
@@ -186,8 +317,8 @@ top_cards = dbc.Row([
                 dbc.CardBody(
                     [
                         html.H5(
-                            "Prom. palabras por reseña", className="card-title text-muted font-weight-normal mt-2 mb-3 mr-5"),
-                        html.H4(children = str('{:,}'.format(users_df['review_count'].median()))),
+                            "Cantidad de géneros", className="card-title text-muted font-weight-normal mt-2 mb-3 mr-5"),
+                        html.H4(children = str('{:,}'.format(words_count))),
                     ],
 
                     className="pt-2 pb-2 box"
@@ -207,7 +338,7 @@ top_cards = dbc.Row([
                     [
                         html.H5(
                             "Cantidad de reseñas", className="card-title text-muted font-weight-normal mt-2 mb-3 mr-5"),
-                        html.H4(children = str('{:,}'.format(review_df['review_id'].count()))),
+                        html.H4(children = str('{:,}'.format(ratings.shape[0]))),
                     ],
 
                     className="pt-2 pb-2 box"
@@ -227,6 +358,7 @@ top_cards = dbc.Row([
         className="mt-1 mb-2"
 
     )
+
 
 
 home = html.Div([
@@ -384,7 +516,7 @@ dashboard = html.Div([
                                 [
 
 
-                                    html.H5("Cantidad de reseñas por calificación",
+                                    html.H5("Cantidad de películas por género",
                                             className="card-title"),
                                     
                                     
@@ -393,7 +525,7 @@ dashboard = html.Div([
 
                                         
                                         
-                                        figure=px.bar(rev_stars, y = "stars", labels = {'index': 'stars', 'stars' : 'cantidad'})),
+                                        figure=px.histogram(ratings, x = "rating", labels = {'index': 'cantidad', 'rating' : 'rating'})),
                                     
                                 ]
                             ),
@@ -416,7 +548,7 @@ dashboard = html.Div([
                                     html.H5("Cantidad de reseñas por negocio",
                                             className="card-title"),
 
-                                    dcc.Graph(figure = px.histogram(review_df.groupby('business_id').agg({'stars':'count'}), x="stars", labels = {'stars' : 'reviews'})),
+                                    dcc.Graph(figure = px.histogram(genres_df, x = "Género", y = "Cantidad")),
                                 ]
                             ),
                         ],
@@ -431,10 +563,12 @@ dashboard = html.Div([
                         [
                             dbc.CardBody(
                                 [
-                                    html.H5("Relación entre estrellas y sentimientos",
+                                    html.H5("Tags más populares según sus películas",
                                             className="card-title"),
-
-                                    dcc.Graph(figure =px.bar(rev_feel, x="stars", y="prom", color = 'feeling')),
+                                    html.Br(),
+                                    html.Br(),
+                                    html.Br(),        
+                                    html.Div(html.Img(src=app.get_asset_url('wordcloud.png'), style={'height':'200%', 'width':'100%'})),
                                 ]
                             ),
                         ],
